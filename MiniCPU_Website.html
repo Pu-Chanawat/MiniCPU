@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini CPU 8-bit — CEDT Digital Logic 2110252</title>
+<style>
+/* ── Token system ── */
+:root {
+  --hue: 220;
+  --accent-hue: 160;
+
+  --bg:        oklch(97% 0.005 var(--hue));
+  --surface:   oklch(100% 0 0);
+  --raised:    oklch(94% 0.008 var(--hue));
+  --border:    oklch(88% 0.010 var(--hue));
+  --muted:     oklch(58% 0.018 var(--hue));
+  --body:      oklch(20% 0.025 var(--hue));
+  --heading:   oklch(13% 0.030 var(--hue));
+
+  --accent:       oklch(52% 0.18 var(--hue));
+  --accent-light: oklch(92% 0.06 var(--hue));
+  --accent-dark:  oklch(38% 0.18 var(--hue));
+
+  --green:  oklch(58% 0.17 150);
+  --red:    oklch(55% 0.18 25);
+  --yellow: oklch(72% 0.16 90);
+  --purple: oklch(55% 0.18 290);
+
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 20px;
+  --shadow-sm: 0 1px 3px oklch(0% 0 0 / 0.08), 0 0 0 1px var(--border);
+  --shadow-md: 0 4px 16px oklch(0% 0 0 / 0.10), 0 0 0 1px var(--border);
+  --font: 'Segoe UI', system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--body);
+  line-height: 1.6;
+  font-size: 16px;
+}
+
+/* ── Layout ── */
+.container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+section { padding: 80px 0; }
+section:nth-child(even) { background: var(--surface); }
+
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); color: var(--heading); line-height: 1.2; }
+h2 { font-size: clamp(1.4rem, 3vw, 2rem); color: var(--heading); margin-bottom: 16px; }
+h3 { font-size: 1.15rem; color: var(--heading); margin-bottom: 8px; }
+p  { color: var(--body); max-width: 68ch; }
+
+.tag {
+  display: inline-block;
+  padding: 3px 10px;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* ── Nav ── */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  background: oklch(97% 0.005 var(--hue) / 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; max-width: 1100px; margin: 0 auto; }
+.brand { font-weight: 700; color: var(--heading); font-size: 1rem; }
+.brand span { color: var(--accent); }
+.nav-links { display: flex; gap: 22px; }
+.nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.15s; }
+.nav-links a:hover { color: var(--accent); }
+.theme-btn { background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 6px 12px; cursor: pointer; color: var(--body); font-size: 0.85rem; }
+
+/* ── Hero ── */
+.hero { padding: 100px 0 60px; text-align: center; }
+.hero .tag { margin-bottom: 18px; }
+.hero p { margin: 14px auto 0; font-size: 1.12rem; color: var(--muted); }
+.hero-stats { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; margin-top: 36px; }
+.stat { text-align: center; }
+.stat .num { font-size: 2rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.stat .lbl { font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+/* ── Cards ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 28px; box-shadow: var(--shadow-sm); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+@media (max-width: 800px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+/* ── Table ── */
+.tbl { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.tbl th { text-align: left; padding: 10px 12px; background: var(--raised); color: var(--heading); border-bottom: 1px solid var(--border); }
+.tbl td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.tbl tr:hover td { background: var(--accent-light); }
+.tbl code { font-family: ui-monospace, 'Cascadia Code', monospace; background: var(--raised); padding: 1px 6px; border-radius: 4px; font-size: 0.82rem; color: var(--accent-dark); }
+
+/* ── Reg panel ── */
+.reg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 12px; }
+.reg-box {
+  background: var(--surface); border: 2px solid var(--border); border-radius: var(--r-md);
+  padding: 14px 10px; text-align: center; transition: border-color .2s, transform .15s;
+}
+.reg-box.active { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 6px 20px oklch(52% .18 var(--hue) / .18); }
+.reg-box .reg-name { font-size: .75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.reg-box .reg-val  { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); font-family: ui-monospace,monospace; margin-top: 4px; }
+.reg-box .reg-dec  { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+
+/* ── FSM diagram ── */
+.fsm-wrap { position: relative; width: 100%; max-width: 700px; margin: 32px auto 0; }
+.fsm-svg { width: 100%; height: auto; }
+.fsm-state circle { fill: var(--raised); stroke: var(--border); stroke-width: 2; transition: fill .3s, stroke .3s; }
+.fsm-state text  { font-family: var(--font); font-size: 13px; font-weight: 600; fill: var(--heading); pointer-events: none; }
+.fsm-state.current circle { fill: var(--accent-light); stroke: var(--accent); stroke-width: 3; }
+.fsm-state.current text   { fill: var(--accent-dark); }
+.fsm-arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#arr); }
+.fsm-arrow-lbl { font-size: 10px; fill: var(--muted); font-family: var(--font); }
+
+/* ── CPU datapath animation ── */
+.dp-wrap { background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 32px; position: relative; overflow: hidden; min-height: 340px; }
+.dp-block {
+  position: absolute; background: var(--surface); border: 2px solid var(--border);
+  border-radius: var(--r-md); display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .8rem; color: var(--heading); text-align: center; line-height: 1.3;
+  transition: border-color .3s, box-shadow .3s;
+}
+.dp-block.lit { border-color: var(--accent); box-shadow: 0 0 0 3px oklch(52% .18 var(--hue) / .15); }
+.dp-signal {
+  position: absolute; border-radius: 999px; background: var(--accent);
+  opacity: 0; pointer-events: none;
+}
+@keyframes pulse-flow {
+  0%   { opacity: 0; transform: scale(0); }
+  30%  { opacity: 1; transform: scale(1); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(0); }
+}
+.dp-signal.run { animation: pulse-flow .8s ease forwards; }
+
+/* ── Step controls ── */
+.ctrl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+.btn {
+  padding: 10px 22px; border-radius: var(--r-sm); border: none; cursor: pointer;
+  font-weight: 600; font-size: .9rem; transition: background .15s, transform .1s;
+}
+.btn:active { transform: scale(.96); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-ghost { background: var(--raised); color: var(--body); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--border); }
+.step-lbl { font-size: .9rem; color: var(--muted); }
+.step-desc { margin-top: 14px; background: var(--surface); border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: .9rem; min-height: 44px; transition: opacity .2s; }
+
+/* ── Mem map ── */
+.memmap { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; font-family: ui-monospace,monospace; font-size: .82rem; }
+.memrow { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--border); }
+.memrow:last-child { border-bottom: none; }
+.memrow .addr { padding: 7px 12px; background: var(--raised); color: var(--muted); min-width: 68px; border-right: 1px solid var(--border); }
+.memrow .label { padding: 7px 12px; flex: 1; }
+.memrow.zone-result { background: oklch(92% .07 150); }
+.memrow.zone-stack  { background: oklch(93% .06 25); }
+.memrow.zone-free   { background: var(--surface); }
+
+/* ── Instruction decoder ── */
+.decoder-wrap { background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 28px; }
+.opcode-bits { display: flex; gap: 4px; flex-wrap: wrap; margin: 16px 0; }
+.bit-btn {
+  width: 44px; height: 44px; border: 2px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); font-weight: 700; font-size: 1.1rem; cursor: pointer;
+  transition: all .15s; font-family: ui-monospace,monospace; color: var(--heading);
+}
+.bit-btn:hover { border-color: var(--accent); }
+.bit-btn.on  { background: var(--accent); border-color: var(--accent); color: #fff; }
+.bit-sep { width: 10px; }
+.decode-result { margin-top: 16px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); min-height: 56px; }
+.decode-result .mnemonic { font-size: 1.2rem; font-weight: 700; color: var(--accent-dark); font-family: ui-monospace,monospace; }
+.decode-result .desc { font-size: .88rem; color: var(--muted); margin-top: 4px; }
+.group-badge {
+  display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 700;
+  margin-right: 6px; margin-bottom: 4px;
+}
+.gb-data    { background: oklch(90% .08 150); color: oklch(36% .12 150); }
+.gb-mem     { background: oklch(90% .08 220); color: oklch(36% .12 220); }
+.gb-alu     { background: oklch(90% .08 290); color: oklch(36% .12 290); }
+.gb-ctrl    { background: oklch(90% .08 25);  color: oklch(36% .12 25); }
+
+/* ── Stack viz ── */
+.stack-viz { max-width: 320px; }
+.stack-cell {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  font-family: ui-monospace,monospace; font-size: .85rem; transition: background .2s;
+}
+.stack-cell.sp-row { background: oklch(92% .07 var(--hue)); font-weight: 700; }
+.stack-cell .s-addr { color: var(--muted); min-width: 48px; }
+.stack-cell .s-val  { flex: 1; color: var(--heading); }
+.stack-cell .s-tag  { font-size: .72rem; color: var(--accent); }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .dp-signal.run, * { animation: none !important; transition-duration: .01ms !important; }
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:        oklch(14% 0.012 var(--hue));
+    --surface:   oklch(18% 0.015 var(--hue));
+    --raised:    oklch(22% 0.016 var(--hue));
+    --border:    oklch(32% 0.018 var(--hue));
+    --muted:     oklch(62% 0.018 var(--hue));
+    --body:      oklch(88% 0.010 var(--hue));
+    --heading:   oklch(96% 0.006 var(--hue));
+    --accent:       oklch(62% 0.16 var(--hue));
+    --accent-light: oklch(24% 0.06 var(--hue));
+    --accent-dark:  oklch(80% 0.14 var(--hue));
+  }
+  .memrow.zone-result { background: oklch(22% .06 150); }
+  .memrow.zone-stack  { background: oklch(22% .05 25); }
+  .gb-data    { background: oklch(24% .07 150); color: oklch(75% .12 150); }
+  .gb-mem     { background: oklch(24% .07 220); color: oklch(75% .12 220); }
+  .gb-alu     { background: oklch(24% .07 290); color: oklch(75% .12 290); }
+  .gb-ctrl    { background: oklch(24% .07 25);  color: oklch(75% .12 25); }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="brand">Mini<span>CPU</span> 8-bit</span>
+    <div class="nav-links">
+      <a href="#overview">ภาพรวม</a>
+      <a href="#fsm">FSM</a>
+      <a href="#datapath">Datapath</a>
+      <a href="#isa">คำสั่ง</a>
+      <a href="#memory">Memory</a>
+      <a href="#special">พิเศษ</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="overview">
+  <div class="container">
+    <div class="tag">CEDT Digital Logic 2110252 · Final Project 2569</div>
+    <h1>Mini CPU 8-bit<br>+ Stack</h1>
+    <p>CPU ขนาด 8 บิตแบบ Multiple-Cycle สร้างด้วยโปรแกรม Digital รองรับ 44 คำสั่ง มี ALU, Stack, GCD และ Fibonacci</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="num">8</div><div class="lbl">Data Bits</div></div>
+      <div class="stat"><div class="num">14</div><div class="lbl">Instr Bits</div></div>
+      <div class="stat"><div class="num">44</div><div class="lbl">คำสั่ง</div></div>
+      <div class="stat"><div class="num">21</div><div class="lbl">Registers</div></div>
+      <div class="stat"><div class="num">8</div><div class="lbl">FSM States</div></div>
+      <div class="stat"><div class="num">512</div><div class="lbl">Bytes RAM</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- REGISTERS -->
+<section id="registers">
+  <div class="container">
+    <div class="tag">Registers</div>
+    <h2>Register File — 21 Registers</h2>
+    <p style="margin-bottom:28px">คลิกที่ register เพื่อดูรายละเอียด ส่วน interactive แสดง simulation ค่าตัวอย่าง</p>
+    <div class="reg-grid" id="regGrid"></div>
+    <div id="regDetail" style="margin-top:20px;padding:18px;background:var(--raised);border-radius:var(--r-md);min-height:52px;font-size:.9rem;color:var(--muted);">คลิก register ด้านบนเพื่อดูคำอธิบาย</div>
+  </div>
+</section>
+
+<!-- FSM -->
+<section id="fsm" style="background:var(--surface)">
+  <div class="container">
+    <div class="tag">Control Unit</div>
+    <h2>Finite State Machine — 8 States</h2>
+    <p>Control Unit ทำงานเป็น Sequential Logic ควบคุมการไหลของคำสั่งตั้งแต่ IDLE จนถึง OUT</p>
+    <div class="fsm-wrap">
+      <svg class="fsm-svg" viewBox="0 0 700 480" id="fsmSvg">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="var(--muted)"/>
+          </marker>
+        </defs>
+        <!-- arrows -->
+        <g id="fsmArrows"></g>
+        <!-- states drawn by JS -->
+        <g id="fsmStates"></g>
+      </svg>
+    </div>
+    <div class="ctrl" style="justify-content:center">
+      <button class="btn btn-ghost" id="fsmPrev">◀ ก่อนหน้า</button>
+      <button class="btn btn-primary" id="fsmNext">ถัดไป ▶</button>
+      <button class="btn btn-ghost" id="fsmAuto">▶▶ Auto</button>
+    </div>
+    <div class="step-desc" id="fsmDesc">กด "ถัดไป" เพื่อเริ่ม simulation ของ FSM</div>
+  </div>
+</section>
+
+<!-- DATAPATH ANIMATION -->
+<section id="datapath">
+  <div class="container">
+    <div class="tag">Datapath</div>
+    <h2>CPU Datapath — Fetch → Exec → Stop → Out</h2>
+    <p>กด Step เพื่อดูการไหลของข้อมูลผ่านส่วนต่างๆ ของ CPU ทีละขั้นตอน</p>
+    <div class="dp-wrap" id="dpWrap" style="margin-top:24px">
+      <!-- blocks positioned by JS -->
+    </div>
+    <div class="ctrl">
+      <button class="btn btn-primary" id="dpStep">Step ▶</button>
+      <button class="btn btn-ghost" id="dpReset">Reset</button>
+      <span class="step-lbl" id="dpStepLbl">Step 0 / 6</span>
+    </div>
+    <div class="step-desc" id="dpDesc">กด Step เพื่อเริ่ม</div>
+  </div>
+</section>
+
+<!-- INSTRUCTION DECODER -->
+<section id="isa" style="background:var(--surface)">
+  <div class="container">
+    <div class="tag">Instruction Set</div>
+    <h2>Instruction Decoder — ลองป้อน Opcode</h2>
+    <p>คลิกสลับ bit เพื่อดูว่า opcode นั้นคือคำสั่งอะไร CPU รองรับ 44 คำสั่งใน 4 กลุ่ม</p>
+    <div class="decoder-wrap" style="margin-top:24px">
+      <div style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Opcode [5:4] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [3:2] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [1:0]</div>
+      <div class="opcode-bits" id="opcBits"></div>
+      <div class="decode-result" id="decResult">
+        <div class="mnemonic">00 000000 = NOP</div>
+        <div class="desc">ไม่ทำงาน ข้ามไปคำสั่งถัดไป</div>
+      </div>
+    </div>
+    <div style="margin-top:36px;overflow-x:auto">
+      <h3 style="margin-bottom:12px">ตาราง Opcode ทั้งหมด</h3>
+      <table class="tbl" id="isaTbl"></table>
+    </div>
+  </div>
+</section>
+
+<!-- MEMORY MAP -->
+<section id="memory">
+  <div class="container">
+    <div class="tag">Memory</div>
+    <h2>Memory Map — pRAM &amp; rRAM</h2>
+    <div class="grid-2" style="margin-top:24px;gap:32px;align-items:start">
+      <div>
+        <h3>pRAM — Program RAM (256 × 14 bit)</h3>
+        <p style="font-size:.88rem;margin:8px 0 16px">เก็บโปรแกรม 14-bit ต่อคำสั่ง โหลดเข้าผ่าน <code style="font-family:monospace;font-size:.82rem">progIn</code> ขณะ <code style="font-family:monospace;font-size:.82rem">progLoad=1</code></p>
+        <div class="memmap">
+          <div class="memrow"><span class="addr">0x00</span><span class="label zone-result">คำสั่งแรก (Instruction 0)</span></div>
+          <div class="memrow"><span class="addr">0x01</span><span class="label zone-result">Instruction 1</span></div>
+          <div class="memrow"><span class="addr">…</span><span class="label zone-free" style="color:var(--muted)">… คำสั่งถัดไป</span></div>
+          <div class="memrow"><span class="addr">0xFF</span><span class="label zone-free">Instruction 255 (สูงสุด)</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>rRAM — Result RAM (256 × 8 bit)</h3>
+        <p style="font-size:.88rem;margin:8px 0 16px">เก็บผลลัพธ์และใช้เป็น Stack แบ่งโซนชัดเจน</p>
+        <div class="memmap">
+          <div class="memrow zone-result"><span class="addr">0x00</span><span class="label">📤 Output[0] — ส่งออกเมื่อ result=1</span></div>
+          <div class="memrow zone-result"><span class="addr">…</span><span class="label">Output[1..14]</span></div>
+          <div class="memrow zone-result"><span class="addr">0x0F</span><span class="label">📤 Output[15] — ส่งออกตัวสุดท้าย</span></div>
+          <div class="memrow zone-free"><span class="addr">0x10</span><span class="label" style="color:var(--muted)">พื้นที่ทั่วไป (indirect memory)</span></div>
+          <div class="memrow zone-free"><span class="addr">…</span><span class="label" style="color:var(--muted)">…</span></div>
+          <div class="memrow zone-free"><span class="addr">0xDF</span><span class="label" style="color:var(--muted)">ขอบพื้นที่ทั่วไป</span></div>
+          <div class="memrow zone-stack"><span class="addr">0xE0</span><span class="label">📦 Stack bottom (ลึกสุด 32 ชั้น)</span></div>
+          <div class="memrow zone-stack"><span class="addr">…</span><span class="label">Stack grows ↓ (full descending)</span></div>
+          <div class="memrow zone-stack"><span class="addr">0xFF</span><span class="label">📦 Stack top — PUSH ครั้งแรก</span></div>
+        </div>
+        <div style="margin-top:10px;font-size:.78rem;color:var(--muted)">
+          <span style="display:inline-block;width:12px;height:12px;background:oklch(92% .07 150);border-radius:3px;margin-right:4px"></span>Output
+          <span style="display:inline-block;width:12px;height:12px;background:oklch(93% .06 25);border-radius:3px;margin:0 4px 0 12px"></span>Stack
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STACK SIMULATOR -->
+<section id="stack" style="background:var(--surface)">
+  <div class="container">
+    <div class="tag">Stack</div>
+    <h2>Stack Simulator — PUSH / POP</h2>
+    <p>Stack อยู่ใน rRAM[0xE0–0xFF] โตลงจากบน (Full Descending) SP ชี้ top-of-stack</p>
+    <div style="margin-top:24px;display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+      <div>
+        <div class="ctrl" style="margin-top:0;margin-bottom:16px">
+          <button class="btn btn-primary" id="pushBtn">PUSH accA</button>
+          <button class="btn btn-ghost" id="popBtn">POP accA</button>
+          <button class="btn btn-ghost" id="stackReset">Reset</button>
+        </div>
+        <div style="margin-bottom:10px;font-size:.88rem">
+          accA = <input id="accAInput" type="text" value="0x42" style="width:72px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-family:monospace;background:var(--surface);color:var(--heading)">
+          &nbsp;&nbsp; SP = <span id="spDisplay" style="font-family:monospace;font-weight:700;color:var(--accent)">0x00</span>
+        </div>
+        <div class="stack-viz" id="stackViz"></div>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <h3 style="margin-bottom:12px">คำอธิบาย</h3>
+        <div id="stackMsg" class="step-desc" style="margin-top:0">Stack ว่าง SP = 0x00</div>
+        <div style="margin-top:16px;font-size:.85rem;line-height:1.8;color:var(--body)">
+          <b>PUSH accA:</b> SP ← SP−1, rRAM[SP] ← accA<br>
+          <b>POP accA:</b> accA ← rRAM[SP], SP ← SP+1<br>
+          ค่าแรกที่ push จะอยู่ที่ 0xFF
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPECIAL INSTRUCTIONS -->
+<section id="special">
+  <div class="container">
+    <div class="tag">Special Instructions</div>
+    <h2>GCD และ Fibonacci — คำสั่งพิเศษที่วนลูปในวงจร</h2>
+    <div class="grid-2" style="margin-top:24px;gap:24px">
+
+      <!-- GCD -->
+      <div class="card">
+        <h3>GCD — หาร.ม. (opcode 11 1100)</h3>
+        <p style="font-size:.88rem;margin:8px 0 16px">อัลกอริทึม Euclidean แบบลบซ้ำ วนลูปใน GCD state จนกว่า gcdA = gcdB</p>
+        <div style="display:flex;gap:12px;margin-bottom:14px">
+          <div>
+            <label style="font-size:.8rem;color:var(--muted)">accA</label>
+            <input id="gcdA" type="number" min="1" max="255" value="48" style="width:72px;display:block;padding:7px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--heading);margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:.8rem;color:var(--muted)">accB</label>
+            <input id="gcdB" type="number" min="1" max="255" value="18" style="width:72px;display:block;padding:7px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--heading);margin-top:4px">
+          </div>
+          <div style="align-self:flex-end">
+            <button class="btn btn-primary" id="gcdRun" style="padding:8px 16px">Run</button>
+          </div>
+        </div>
+        <div id="gcdSteps" style="font-size:.82rem;font-family:monospace;background:var(--raised);border-radius:var(--r-sm);padding:12px;max-height:200px;overflow-y:auto;line-height:1.7"></div>
+        <div id="gcdResult" style="margin-top:10px;font-weight:700;color:var(--accent);font-size:1rem"></div>
+      </div>
+
+      <!-- FIB -->
+      <div class="card">
+        <h3>Fibonacci — FIB(n) (opcode 11 1101)</h3>
+        <p style="font-size:.88rem;margin:8px 0 16px">วนลูปใน FIB state ผลลัพธ์ 16-bit เก็บที่ rRAM[0x0A:0x0B] (n ≤ 24)</p>
+        <div style="display:flex;gap:12px;margin-bottom:14px;align-items:flex-end">
+          <div>
+            <label style="font-size:.8rem;color:var(--muted)">n (accA[4:0])</label>
+            <input id="fibN" type="number" min="0" max="24" value="10" style="width:72px;display:block;padding:7px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--heading);margin-top:4px">
+          </div>
+          <button class="btn btn-primary" id="fibRun" style="padding:8px 16px">Run</button>
+        </div>
+        <div id="fibSteps" style="font-size:.82rem;font-family:monospace;background:var(--raised);border-radius:var(--r-sm);padding:12px;max-height:200px;overflow-y:auto;line-height:1.7"></div>
+        <div id="fibResult" style="margin-top:10px;font-weight:700;color:var(--accent);font-size:1rem"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EXAMPLE PROGRAM -->
+<section id="example" style="background:var(--surface)">
+  <div class="container">
+    <div class="tag">ตัวอย่าง</div>
+    <h2>โปรแกรมตัวอย่าง — Swap M ↔ N ผ่าน Stack</h2>
+    <p style="margin-bottom:20px">โปรแกรมนี้อ่าน M, N แล้วสลับค่ากันโดยใช้ Stack เก็บค่า SP ขณะมีข้อมูล 2 ชั้นไว้ที่ rRAM[0x02]</p>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Address</th><th>Opcode (bin)</th><th>คำสั่ง</th><th>ผล</th></tr></thead>
+        <tbody id="exTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ══════════════════════════════════════════════
+   1. REGISTER GRID
+══════════════════════════════════════════════ */
+const REGS = [
+  { name:'accA', bits:8, val:'0x00', desc:'Accumulator A — รับ input ALU และเก็บผลลัพธ์ทุกคำสั่ง ALU ผลออกมาที่ accA เสมอ' },
+  { name:'accB', bits:8, val:'0x00', desc:'Accumulator B — operand ที่สองของ ALU และ Stack' },
+  { name:'regC', bits:8, val:'0x00', desc:'Register C — ใช้เป็น address ใน indirect memory (rRAM[regC]) และรับค่า input M' },
+  { name:'regD', bits:8, val:'0x00', desc:'Register D — counter ใน DJNZ (ลด 1 ทุกรอบจนถึง 0) และรับค่า input N' },
+  { name:'SP',   bits:8, val:'0x00', desc:'Stack Pointer — ชี้ top-of-stack ใน rRAM ช่วง 0xE0–0xFF (full descending, 0x00 = ว่าง)' },
+  { name:'PC',   bits:8, val:'0x00', desc:'Program Counter — address คำสั่งถัดไปใน pRAM เพิ่มขึ้น 1 ทุก fetch หรือกระโดดตาม jump' },
+  { name:'IR',   bits:14,val:'0x0000',desc:'Instruction Register — เก็บคำสั่ง 14 บิตที่ fetch มาจาก pRAM [13:8]=opcode [7:0]=operand' },
+  { name:'STATE',bits:3, val:'0',    desc:'FSM State Register — เก็บ state ปัจจุบัน: 0=IDLE 1=CLEAR 2=FETCH 3=EXEC 4=GCD 5=FIB 6=STOP 7=OUT' },
+  { name:'cnt4', bits:4, val:'0x0',  desc:'Cycle Counter — นับรอบภายใน state ปัจจุบัน ใช้ใน CLEAR (นับ 16 รอบ) และ EXEC multi-cycle' },
+  { name:'FLAG_EQ',bits:1,val:'0',   desc:'Equal Flag — ตั้งเป็น 1 เมื่อ CMP พบว่า accA = accB หรือ isPrime(accA) = true' },
+  { name:'FLAG_GR',bits:1,val:'0',   desc:'Greater Flag — ตั้งเป็น 1 เมื่อ CMP พบว่า accA > accB (2\'s complement)' },
+  { name:'FLAG_LS',bits:1,val:'0',   desc:'Less Flag — ตั้งเป็น 1 เมื่อ CMP พบว่า accA < accB (2\'s complement)' },
+  { name:'gcdA', bits:8, val:'0x00', desc:'Working register A ของ GCD — เก็บสำเนา accA ระหว่างวนลูป Euclidean subtraction' },
+  { name:'gcdB', bits:8, val:'0x00', desc:'Working register B ของ GCD — เก็บสำเนา accB ระหว่างวนลูป' },
+  { name:'fib0', bits:16,val:'0x0000',desc:'Fibonacci F(n-2) — ค่า Fibonacci สองรอบก่อน ใช้คำนวณ F(n) = F(n-1) + F(n-2)' },
+  { name:'fib1', bits:16,val:'0x0001',desc:'Fibonacci F(n-1) — ค่า Fibonacci รอบก่อน ผลลัพธ์สุดท้ายเก็บตรงนี้' },
+  { name:'fibN', bits:5, val:'0x00', desc:'Fibonacci Counter — นับถอยหลังจาก n ลงมา 0 = หยุดลูป' },
+  { name:'fib_step',bits:1,val:'0',  desc:'Fibonacci Step — ควบคุมการเขียนผล: 0 = เขียน high byte → rRAM[0x0A], 1 = เขียน low byte → rRAM[0x0B]' },
+  { name:'valid_reg',bits:1,val:'0', desc:'Valid FF — ตั้ง 1 เมื่อโปรแกรมทำงานถึง STOP ล้างเมื่อ start หรือ progLoad' },
+  { name:'done_reg',bits:1,val:'0',  desc:'Done FF — ตั้ง 1 เมื่อส่ง output ครบ 16 ค่าแล้ว ล้างเมื่อ reset' },
+  { name:'load_cnt',bits:8,val:'0x00',desc:'Load Counter — นับ address ของ pRAM ขณะ progLoad=1 เพื่อเก็บคำสั่งทีละตัว' },
+];
+const regGrid = document.getElementById('regGrid');
+const regDetail = document.getElementById('regDetail');
+REGS.forEach((r,i) => {
+  const box = document.createElement('div');
+  box.className = 'reg-box';
+  box.innerHTML = `<div class="reg-name">${r.name}</div><div class="reg-val">${r.val}</div><div class="reg-dec">${r.bits} bit</div>`;
+  box.addEventListener('click', () => {
+    document.querySelectorAll('.reg-box').forEach(b=>b.classList.remove('active'));
+    box.classList.add('active');
+    regDetail.innerHTML = `<b style="color:var(--heading)">${r.name}</b> [${r.bits} bit] — ${r.desc}`;
+  });
+  regGrid.appendChild(box);
+});
+
+/* ══════════════════════════════════════════════
+   2. FSM DIAGRAM
+══════════════════════════════════════════════ */
+const FSM_STATES = [
+  { id:'IDLE',  x:350, y:50,  col:'var(--muted)' },
+  { id:'CLEAR', x:170, y:150, col:'var(--yellow)' },
+  { id:'FETCH', x:530, y:150, col:'var(--accent)' },
+  { id:'EXEC',  x:530, y:290, col:'var(--green)' },
+  { id:'GCD',   x:170, y:290, col:'var(--purple)' },
+  { id:'FIB',   x:350, y:290, col:'var(--purple)' },
+  { id:'STOP',  x:530, y:420, col:'var(--red)' },
+  { id:'OUT',   x:350, y:420, col:'var(--accent)' },
+];
+const FSM_ARROWS = [
+  { from:'IDLE',  to:'CLEAR', lbl:'reset/start' },
+  { from:'CLEAR', to:'FETCH', lbl:'cleared' },
+  { from:'FETCH', to:'EXEC',  lbl:'IR loaded' },
+  { from:'EXEC',  to:'FETCH', lbl:'next instr' },
+  { from:'EXEC',  to:'GCD',   lbl:'op=GCD' },
+  { from:'EXEC',  to:'FIB',   lbl:'op=FIB' },
+  { from:'EXEC',  to:'STOP',  lbl:'op=STOP' },
+  { from:'GCD',   to:'FETCH', lbl:'done' },
+  { from:'FIB',   to:'FETCH', lbl:'done' },
+  { from:'STOP',  to:'OUT',   lbl:'result=1' },
+  { from:'OUT',   to:'IDLE',  lbl:'done' },
+];
+const FSM_STEPS = [
+  { state:'IDLE',  desc:'CPU รอสัญญาณ reset, progLoad, หรือ start อยู่นิ่งๆ ไม่ทำอะไร' },
+  { state:'CLEAR', desc:'ล้าง rRAM[0x00–0x0F] = 0 ทีละ address ใช้ cnt4 นับ 16 รอบ (รีเซ็ตพื้นที่ผลลัพธ์)' },
+  { state:'FETCH', desc:'ส่ง PC เข้า pRAM → รับคำสั่ง 14 บิตออกมา → เก็บลง IR → PC ← PC + 1' },
+  { state:'EXEC',  desc:'Decode opcode จาก IR[13:8] → ทำคำสั่ง → อัปเดต register/memory/flag → กลับ FETCH (หรือเข้า GCD/FIB/STOP)' },
+  { state:'GCD',   desc:'วนลูป Euclidean: ถ้า gcdA > gcdB → gcdA←gcdA−gcdB; ถ้า gcdB > gcdA → gcdB←gcdB−gcdA; ถ้าเท่ากัน → กลับ FETCH' },
+  { state:'FIB',   desc:'วนลูป Fibonacci: fib_sum=fib0+fib1, fib0←fib1, fib1←fib_sum, fibN−− จนถึง 0 → เขียน rRAM[0x0A:0x0B] → FETCH' },
+  { state:'STOP',  desc:'ตั้ง valid=1 รอสัญญาณ result จากภายนอก CPU หยุดทำงาน' },
+  { state:'OUT',   desc:'ส่ง rRAM[0x00–0x0F] ออกทาง output ทีละ clock รวม 16 clock แล้วตั้ง done=1' },
+];
+const svgNS = 'http://www.w3.org/2000/svg';
+const statesG = document.getElementById('fsmStates');
+const arrowsG = document.getElementById('fsmArrows');
+const R = 36;
+FSM_STATES.forEach(s => {
+  const g = document.createElementNS(svgNS,'g');
+  g.classList.add('fsm-state'); g.id='fsm-'+s.id;
+  const c = document.createElementNS(svgNS,'circle');
+  c.setAttribute('cx',s.x); c.setAttribute('cy',s.y); c.setAttribute('r',R);
+  const t = document.createElementNS(svgNS,'text');
+  t.setAttribute('x',s.x); t.setAttribute('y',s.y+5); t.setAttribute('text-anchor','middle');
+  t.textContent = s.id;
+  g.appendChild(c); g.appendChild(t);
+  statesG.appendChild(g);
+});
+FSM_ARROWS.forEach(a => {
+  const sf = FSM_STATES.find(s=>s.id===a.from), st = FSM_STATES.find(s=>s.id===a.to);
+  if(!sf||!st) return;
+  const dx=st.x-sf.x, dy=st.y-sf.y, len=Math.hypot(dx,dy);
+  const ux=dx/len, uy=dy/len;
+  const x1=sf.x+ux*R, y1=sf.y+uy*R, x2=st.x-ux*(R+6), y2=st.y-uy*(R+6);
+  const mx=(x1+x2)/2, my=(y1+y2)/2;
+  const path = document.createElementNS(svgNS,'line');
+  path.setAttribute('x1',x1); path.setAttribute('y1',y1);
+  path.setAttribute('x2',x2); path.setAttribute('y2',y2);
+  path.classList.add('fsm-arrow');
+  arrowsG.appendChild(path);
+  const lbl = document.createElementNS(svgNS,'text');
+  lbl.setAttribute('x',mx-uy*10); lbl.setAttribute('y',my+ux*10+4);
+  lbl.setAttribute('text-anchor','middle'); lbl.classList.add('fsm-arrow-lbl');
+  lbl.textContent = a.lbl;
+  arrowsG.appendChild(lbl);
+});
+let fsmIdx = -1, fsmTimer = null;
+function setFsmState(idx) {
+  fsmIdx = (idx + FSM_STEPS.length) % FSM_STEPS.length;
+  const step = FSM_STEPS[fsmIdx];
+  document.querySelectorAll('.fsm-state').forEach(g => g.classList.remove('current'));
+  const el = document.getElementById('fsm-'+step.state);
+  if(el) el.classList.add('current');
+  document.getElementById('fsmDesc').textContent = `[${step.state}] ${step.desc}`;
+}
+document.getElementById('fsmNext').addEventListener('click',()=>setFsmState(fsmIdx+1));
+document.getElementById('fsmPrev').addEventListener('click',()=>setFsmState(fsmIdx-1));
+document.getElementById('fsmAuto').addEventListener('click',function(){
+  if(fsmTimer){ clearInterval(fsmTimer); fsmTimer=null; this.textContent='▶▶ Auto'; return; }
+  this.textContent='⏸ Pause';
+  fsmTimer = setInterval(()=>setFsmState(fsmIdx+1), 1600);
+});
+setFsmState(0);
+
+/* ══════════════════════════════════════════════
+   3. DATAPATH ANIMATION
+══════════════════════════════════════════════ */
+const DP_BLOCKS = [
+  { id:'pram',  label:'pRAM\n256×14',  l:20,  t:20,  w:110, h:64 },
+  { id:'ir',    label:'IR\n(14-bit)',  l:170, t:20,  w:90,  h:64 },
+  { id:'dec',   label:'Decoder\nROM',  l:300, t:20,  w:90,  h:64 },
+  { id:'pc',    label:'PC\n(8-bit)',   l:20,  t:140, w:90,  h:52 },
+  { id:'rega',  label:'accA',          l:20,  t:230, w:70,  h:44 },
+  { id:'regb',  label:'accB',          l:100, t:230, w:70,  h:44 },
+  { id:'alu',   label:'ALU',           l:58,  t:100+90+48, w:80,  h:52 },
+  { id:'rram',  label:'rRAM\n256×8',   l:430, t:100, w:110, h:80 },
+  { id:'out',   label:'output\n(8-bit)',l:430, t:220, w:110, h:52 },
+];
+const DP_STEPS = [
+  { lit:['pc'],       desc:'FETCH: PC ส่ง address เข้า pRAM' },
+  { lit:['pc','pram'],desc:'pRAM อ่านคำสั่งที่ address ของ PC (14 บิต)' },
+  { lit:['pram','ir'],desc:'คำสั่งเก็บลง IR, PC เพิ่มขึ้น 1' },
+  { lit:['ir','dec'], desc:'EXEC: Decoder ROM แปลง opcode [13:8] → control signals' },
+  { lit:['dec','rega','regb','alu'], desc:'ALU รับ accA, accB → คำนวณ → ผลกลับ accA' },
+  { lit:['alu','rram'], desc:'เขียนผลลงหรืออ่านจาก rRAM (direct/indirect/stack)' },
+  { lit:['rram','out'], desc:'STOP → valid=1 → result=1 → ส่ง rRAM[0x00–0x0F] ออกทาง output' },
+];
+const dpWrap = document.getElementById('dpWrap');
+DP_BLOCKS.forEach(b => {
+  const div = document.createElement('div');
+  div.className = 'dp-block'; div.id='dp-'+b.id;
+  div.style.cssText = `left:${b.l}px;top:${b.t}px;width:${b.w}px;height:${b.h}px;font-size:.75rem;`;
+  div.textContent = b.label;
+  dpWrap.appendChild(div);
+});
+dpWrap.style.height = '320px';
+let dpIdx = 0;
+function runDpStep() {
+  const step = DP_STEPS[dpIdx % DP_STEPS.length];
+  document.querySelectorAll('.dp-block').forEach(el => el.classList.remove('lit'));
+  step.lit.forEach(id => { const el=document.getElementById('dp-'+id); if(el) el.classList.add('lit'); });
+  document.getElementById('dpDesc').textContent = `Step ${(dpIdx%DP_STEPS.length)+1}/${DP_STEPS.length} — ${step.desc}`;
+  document.getElementById('dpStepLbl').textContent = `Step ${(dpIdx%DP_STEPS.length)+1} / ${DP_STEPS.length}`;
+  dpIdx++;
+}
+document.getElementById('dpStep').addEventListener('click', runDpStep);
+document.getElementById('dpReset').addEventListener('click',()=>{ dpIdx=0; document.querySelectorAll('.dp-block').forEach(el=>el.classList.remove('lit')); document.getElementById('dpDesc').textContent='กด Step เพื่อเริ่ม'; document.getElementById('dpStepLbl').textContent='Step 0 / 7'; });
+
+/* ══════════════════════════════════════════════
+   4. INSTRUCTION DECODER
+══════════════════════════════════════════════ */
+const ISA = [
+  // Data group 00
+  {op:'000000',mn:'NOP',       grp:'data', desc:'ไม่ทำงาน ข้ามไปคำสั่งถัดไป'},
+  {op:'000001',mn:'accA←imm', grp:'data', desc:'โหลดค่า operand เข้า accA'},
+  {op:'000010',mn:'accB←imm', grp:'data', desc:'โหลดค่า operand เข้า accB'},
+  {op:'000100',mn:'accA←accB',grp:'data', desc:'คัดลอก accB → accA'},
+  {op:'000101',mn:'accB←accA',grp:'data', desc:'คัดลอก accA → accB'},
+  {op:'000110',mn:'regC←accA',grp:'data', desc:'คัดลอก accA → regC'},
+  {op:'000111',mn:'regD←accA',grp:'data', desc:'คัดลอก accA → regD'},
+  {op:'001000',mn:'accA←regC',grp:'data', desc:'คัดลอก regC → accA'},
+  {op:'001001',mn:'accA←regD',grp:'data', desc:'คัดลอก regD → accA'},
+  {op:'001010',mn:'accA←SP',  grp:'data', desc:'อ่านค่า Stack Pointer เข้า accA'},
+  {op:'001100',mn:'regC←M',   grp:'data', desc:'อ่าน input M เข้า regC'},
+  {op:'001101',mn:'regD←N',   grp:'data', desc:'อ่าน input N เข้า regD'},
+  // Memory group 01
+  {op:'010000',mn:'accA←rRAM[op]', grp:'mem', desc:'อ่าน rRAM direct address = operand → accA'},
+  {op:'010001',mn:'rRAM[op]←accA', grp:'mem', desc:'เขียน accA → rRAM direct address = operand'},
+  {op:'010010',mn:'accA←pRAM[op]', grp:'mem', desc:'อ่าน pRAM[operand] เก็บ 8 บิตล่าง → accA'},
+  {op:'010100',mn:'accA←rRAM[regC]',grp:'mem',desc:'อ่าน rRAM indirect address = regC → accA'},
+  {op:'010101',mn:'rRAM[regC]←accA',grp:'mem',desc:'เขียน accA → rRAM indirect address = regC'},
+  {op:'011000',mn:'PUSH accA', grp:'mem', desc:'SP←SP−1, rRAM[SP]←accA (stack grows down from 0xFF)'},
+  {op:'011001',mn:'POP accA',  grp:'mem', desc:'accA←rRAM[SP], SP←SP+1'},
+  // ALU group 10
+  {op:'100000',mn:'accA←accA+accB', grp:'alu', desc:'บวก 2\'s complement, ทิ้ง overflow'},
+  {op:'100001',mn:'accA←accA−accB', grp:'alu', desc:'ลบ 2\'s complement, ทิ้ง overflow'},
+  {op:'100010',mn:'accA←accA×accB', grp:'alu', desc:'คูณ 4-bit: accA[3:0]×accB[3:0] ไม่มีเครื่องหมาย'},
+  {op:'100100',mn:'accA←accA÷accB', grp:'alu', desc:'หารไม่มีเครื่องหมาย (ไม่หารด้วย 0)'},
+  {op:'100101',mn:'accA←accA%accB', grp:'alu', desc:'Modulo ไม่มีเครื่องหมาย'},
+  {op:'101000',mn:'accA←accA AND accB',grp:'alu',desc:'Bitwise AND'},
+  {op:'101001',mn:'accA←accA OR accB', grp:'alu',desc:'Bitwise OR'},
+  {op:'101010',mn:'accA←accA XOR accB',grp:'alu',desc:'Bitwise XOR'},
+  {op:'101011',mn:'accA←NOT accA',     grp:'alu',desc:'Bitwise NOT — กลับบิตทุกตัวใน accA'},
+  {op:'101100',mn:'accA←accA<<accB',   grp:'alu',desc:'Logical Shift Left, จำนวนครั้ง = accB[2:0]'},
+  {op:'101101',mn:'accA←accA>>accB',   grp:'alu',desc:'Logical Shift Right, จำนวนครั้ง = accB[2:0]'},
+  {op:'101110',mn:'accA←accA<<<accB',  grp:'alu',desc:'Rotate Left, จำนวนครั้ง = accB[2:0]'},
+  {op:'101111',mn:'accA←accA>>>accB',  grp:'alu',desc:'Rotate Right, จำนวนครั้ง = accB[2:0]'},
+  // Control group 11
+  {op:'110000',mn:'JMP addr',  grp:'ctrl', desc:'กระโดดไป address = operand ไม่มีเงื่อนไข'},
+  {op:'110001',mn:'JEQ addr',  grp:'ctrl', desc:'กระโดดถ้า FLAG_EQ = 1'},
+  {op:'110010',mn:'JGR addr',  grp:'ctrl', desc:'กระโดดถ้า FLAG_GR = 1'},
+  {op:'110011',mn:'JLS addr',  grp:'ctrl', desc:'กระโดดถ้า FLAG_LS = 1'},
+  {op:'110100',mn:'DJNZ addr', grp:'ctrl', desc:'regD←regD−1; ถ้า regD≠0 กระโดดไป address'},
+  {op:'111000',mn:'CMP accA,accB',grp:'ctrl',desc:'เปรียบเทียบ accA กับ accB (2\'s complement) ตั้ง EQ/GR/LS'},
+  {op:'111001',mn:'isPrime(accA)',grp:'ctrl',desc:'ตรวจจำนวนเฉพาะ → ตั้ง FLAG_EQ (ใช้ Prime_ROM lookup)'},
+  {op:'111100',mn:'GCD(accA,accB)',grp:'ctrl',desc:'หา ห.ร.ม. วนลูป Euclidean → ผลใน accA'},
+  {op:'111101',mn:'FIB(accA[4:0])',grp:'ctrl',desc:'Fibonacci ลำดับที่ n → rRAM[0x0A:0x0B] (16-bit)'},
+  {op:'111111',mn:'STOP',      grp:'ctrl', desc:'หยุดโปรแกรม ตั้ง valid=1 รอสัญญาณ result'},
+];
+const GRP_CLS = { data:'gb-data', mem:'gb-mem', alu:'gb-alu', ctrl:'gb-ctrl' };
+const GRP_LBL = { data:'Data', mem:'Memory', alu:'ALU', ctrl:'Control' };
+
+// Build opcode bits
+const opcBitsEl = document.getElementById('opcBits');
+const bits = new Array(6).fill(0);
+function renderBits() {
+  opcBitsEl.innerHTML = '';
+  bits.forEach((b,i) => {
+    if(i===2||i===4) { const sep=document.createElement('span'); sep.className='bit-sep'; opcBitsEl.appendChild(sep); }
+    const btn = document.createElement('button');
+    btn.className = 'bit-btn' + (b ? ' on' : '');
+    btn.textContent = b;
+    btn.addEventListener('click', () => { bits[i]^=1; renderBits(); });
+    opcBitsEl.appendChild(btn);
+  });
+  const op = bits.join('');
+  const instr = ISA.find(x=>x.op===op);
+  const el = document.getElementById('decResult');
+  if(instr) {
+    el.innerHTML = `<span class="group-badge ${GRP_CLS[instr.grp]}">${GRP_LBL[instr.grp]}</span><div class="mnemonic">${op.slice(0,2)} ${op.slice(2,4)} ${op.slice(4,6)} → ${instr.mn}</div><div class="desc">${instr.desc}</div>`;
+  } else {
+    el.innerHTML = `<div class="mnemonic" style="color:var(--muted)">${op.slice(0,2)} ${op.slice(2,4)} ${op.slice(4,6)} — ไม่มีคำสั่ง (ยังไม่ใช้หรือสงวนไว้)</div>`;
+  }
+}
+renderBits();
+
+// ISA table
+const isaTbl = document.getElementById('isaTbl');
+isaTbl.innerHTML = '<thead><tr><th>Opcode</th><th>คำสั่ง</th><th>กลุ่ม</th><th>ความหมาย</th></tr></thead>';
+const tbody = document.createElement('tbody');
+ISA.forEach(r => {
+  const tr = document.createElement('tr');
+  const op = r.op;
+  tr.innerHTML = `<td><code>${op.slice(0,2)} ${op.slice(2,4)} ${op.slice(4,6)}</code></td><td><b>${r.mn}</b></td><td><span class="group-badge ${GRP_CLS[r.grp]}">${GRP_LBL[r.grp]}</span></td><td style="color:var(--body)">${r.desc}</td>`;
+  tbody.appendChild(tr);
+});
+isaTbl.appendChild(tbody);
+
+/* ══════════════════════════════════════════════
+   5. STACK SIMULATOR
+══════════════════════════════════════════════ */
+let stackMem = {}; // addr → val
+let sp = 0x00;
+function parseHexDec(s) {
+  s = s.trim();
+  if(s.startsWith('0x')||s.startsWith('0X')) return parseInt(s,16)&0xFF;
+  if(/^\d+$/.test(s)) return parseInt(s,10)&0xFF;
+  return 0x42;
+}
+function renderStack() {
+  const viz = document.getElementById('stackViz');
+  viz.innerHTML = '';
+  const header = document.createElement('div');
+  header.style.cssText = 'padding:7px 14px;background:var(--raised);border-bottom:1px solid var(--border);font-size:.75rem;color:var(--muted);font-weight:700;display:flex;gap:10px';
+  header.innerHTML = '<span style="min-width:48px">ADDR</span><span>VALUE</span><span style="margin-left:auto">TAG</span>';
+  viz.appendChild(header);
+  for(let a=0xFF; a>=0xE0; a--) {
+    if(!stackMem[a] && a > sp) continue; // skip empty above SP
+    const row = document.createElement('div');
+    row.className = 'stack-cell' + (a===sp&&sp!==0 ? ' sp-row':'');
+    const val = stackMem[a]!==undefined ? '0x'+stackMem[a].toString(16).padStart(2,'0').toUpperCase() : '??';
+    row.innerHTML = `<span class="s-addr">0x${a.toString(16).toUpperCase()}</span><span class="s-val">${val}</span><span class="s-tag">${a===sp&&sp!==0?'← SP':''}</span>`;
+    viz.appendChild(row);
+  }
+  if(Object.keys(stackMem).length===0) {
+    const empty = document.createElement('div');
+    empty.style.cssText='padding:14px;color:var(--muted);font-size:.85rem;text-align:center';
+    empty.textContent = 'Stack ว่าง';
+    viz.appendChild(empty);
+  }
+  document.getElementById('spDisplay').textContent = '0x'+sp.toString(16).toUpperCase().padStart(2,'0');
+}
+document.getElementById('pushBtn').addEventListener('click',()=>{
+  const val = parseHexDec(document.getElementById('accAInput').value);
+  if(sp===0) sp=0x100;
+  sp = (sp-1)&0xFF;
+  if(sp < 0xE0) { document.getElementById('stackMsg').textContent='⚠️ Stack overflow! (เกิน 0xE0)'; return; }
+  stackMem[sp] = val;
+  document.getElementById('stackMsg').textContent = `PUSH 0x${val.toString(16).toUpperCase().padStart(2,'0')}: SP←0x${sp.toString(16).toUpperCase()}, rRAM[0x${sp.toString(16).toUpperCase()}]←0x${val.toString(16).toUpperCase().padStart(2,'0')}`;
+  renderStack();
+});
+document.getElementById('popBtn').addEventListener('click',()=>{
+  if(sp===0){ document.getElementById('stackMsg').textContent='⚠️ Stack ว่างอยู่แล้ว ไม่สามารถ POP ได้'; return; }
+  const val = stackMem[sp];
+  document.getElementById('accAInput').value = '0x'+(val||0).toString(16).toUpperCase().padStart(2,'0');
+  document.getElementById('stackMsg').textContent = `POP: accA←0x${(val||0).toString(16).toUpperCase().padStart(2,'0')}, SP←0x${((sp+1)&0xFF).toString(16).toUpperCase()}`;
+  delete stackMem[sp];
+  sp = (sp+1)&0xFF;
+  renderStack();
+});
+document.getElementById('stackReset').addEventListener('click',()=>{ stackMem={}; sp=0x00; document.getElementById('stackMsg').textContent='Stack ว่าง SP = 0x00'; renderStack(); });
+renderStack();
+
+/* ══════════════════════════════════════════════
+   6. GCD SIMULATOR
+══════════════════════════════════════════════ */
+document.getElementById('gcdRun').addEventListener('click',()=>{
+  let a = parseInt(document.getElementById('gcdA').value)||1;
+  let b = parseInt(document.getElementById('gcdB').value)||1;
+  a &= 0xFF; b &= 0xFF;
+  const steps = document.getElementById('gcdSteps');
+  const res   = document.getElementById('gcdResult');
+  steps.innerHTML = '';
+  let iter = 0, maxIter = 500;
+  const orig_a = a, orig_b = b;
+  steps.innerHTML += `<span style="color:var(--muted)">Init: gcdA=0x${a.toString(16).toUpperCase().padStart(2,'0')} (${a}), gcdB=0x${b.toString(16).toUpperCase().padStart(2,'0')} (${b})\n</span>`;
+  while(a !== b && iter++ < maxIter) {
+    if(a > b) {
+      steps.innerHTML += `gcdA(${a}) > gcdB(${b}) → gcdA ← ${a}−${b} = <b>${a-b}</b>\n`;
+      a -= b;
+    } else {
+      steps.innerHTML += `gcdB(${b}) > gcdA(${a}) → gcdB ← ${b}−${a} = <b>${b-a}</b>\n`;
+      b -= a;
+    }
+  }
+  if(iter >= maxIter) { res.textContent = '⚠️ ลูปเกิน 500 รอบ'; return; }
+  steps.innerHTML += `<span style="color:var(--green)">gcdA = gcdB = ${a} → จบลูป</span>`;
+  res.innerHTML = `GCD(${orig_a}, ${orig_b}) = <span style="font-size:1.4rem">${a}</span> &nbsp; (${iter} รอบ)`;
+  steps.scrollTop = steps.scrollHeight;
+});
+
+/* ══════════════════════════════════════════════
+   7. FIBONACCI SIMULATOR
+══════════════════════════════════════════════ */
+document.getElementById('fibRun').addEventListener('click',()=>{
+  let n = parseInt(document.getElementById('fibN').value)||0;
+  n = Math.max(0, Math.min(24, n));
+  const steps = document.getElementById('fibSteps');
+  const res   = document.getElementById('fibResult');
+  steps.innerHTML = '';
+  if(n===0){ steps.innerHTML='n=0 → ผลคือ 0 (base case)'; res.innerHTML='FIB(0) = 0 → rRAM[0x0A]=0x00, rRAM[0x0B]=0x00'; return; }
+  if(n===1){ steps.innerHTML='n=1 → ผลคือ 1 (base case)'; res.innerHTML='FIB(1) = 1 → rRAM[0x0A]=0x00, rRAM[0x0B]=0x01'; return; }
+  let f0=0, f1=1;
+  steps.innerHTML += `Init: fib0=${f0}, fib1=${f1}, fibN=${n}\n`;
+  for(let i=1; i<n; i++) {
+    const s = f0+f1;
+    steps.innerHTML += `ลูป ${i}: fib0=${f0}, fib1=${f1} → sum=${s} → fib0←${f1}, fib1←${s}\n`;
+    f0=f1; f1=s;
+  }
+  const hi=(f1>>8)&0xFF, lo=f1&0xFF;
+  steps.innerHTML += `<span style="color:var(--green)">จบลูป: FIB(${n}) = ${f1} → เขียน rRAM[0x0A]=0x${hi.toString(16).toUpperCase().padStart(2,'0')}, rRAM[0x0B]=0x${lo.toString(16).toUpperCase().padStart(2,'0')}</span>`;
+  res.innerHTML = `FIB(${n}) = <span style="font-size:1.4rem">${f1}</span> &nbsp; (0x${f1.toString(16).toUpperCase().padStart(4,'0')})`;
+  steps.scrollTop = steps.scrollHeight;
+});
+
+/* ══════════════════════════════════════════════
+   8. EXAMPLE PROGRAM TABLE
+══════════════════════════════════════════════ */
+const EXAMPLE = [
+  { addr:'0x00', bits:'00 1100 00000000', instr:'regC ← M',          result:'regC = M' },
+  { addr:'0x01', bits:'00 1101 00000000', instr:'regD ← N',          result:'regD = N' },
+  { addr:'0x02', bits:'00 1000 00000000', instr:'accA ← regC',       result:'accA = M' },
+  { addr:'0x03', bits:'01 1000 00000000', instr:'PUSH accA',         result:'SP=0xFF, rRAM[0xFF]=M' },
+  { addr:'0x04', bits:'00 1001 00000000', instr:'accA ← regD',       result:'accA = N' },
+  { addr:'0x05', bits:'01 1000 00000000', instr:'PUSH accA',         result:'SP=0xFE, rRAM[0xFE]=N' },
+  { addr:'0x06', bits:'00 1010 00000000', instr:'accA ← SP',         result:'accA = 0xFE' },
+  { addr:'0x07', bits:'01 0001 00000010', instr:'rRAM[0x02] ← accA', result:'rRAM[0x02] = 0xFE' },
+  { addr:'0x08', bits:'01 1001 00000000', instr:'POP accA',          result:'accA=N, SP=0xFF' },
+  { addr:'0x09', bits:'01 0001 00000000', instr:'rRAM[0x00] ← accA', result:'rRAM[0x00] = N' },
+  { addr:'0x0A', bits:'01 1001 00000000', instr:'POP accA',          result:'accA=M, SP=0x00' },
+  { addr:'0x0B', bits:'01 0001 00000001', instr:'rRAM[0x01] ← accA', result:'rRAM[0x01] = M' },
+  { addr:'0x0C', bits:'11 1111 00000000', instr:'STOP',              result:'valid = 1' },
+];
+const exTbody = document.getElementById('exTbody');
+EXAMPLE.forEach(r => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><code>${r.addr}</code></td><td><code style="font-size:.78rem">${r.bits}</code></td><td>${r.instr}</td><td style="color:var(--muted)">${r.result}</td>`;
+  exTbody.appendChild(tr);
+});
+</script>
+
+<!-- FOOTER -->
+<footer style="background:var(--raised);border-top:1px solid var(--border);padding:32px 0;text-align:center">
+  <div class="container">
+    <p style="color:var(--muted);font-size:.88rem">CEDT Final Project 2569 · Digital Logic 2110252 · Mini CPU 8-bit + Stack</p>
+  </div>
+</footer>
+
+</body>
+</html>
+
